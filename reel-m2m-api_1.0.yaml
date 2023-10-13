@@ -1,0 +1,435 @@
+---
+security:
+- clientIdHeader: []
+  clientSecretHeader: []
+basePath: "/reel-m2m-api"
+paths:
+  "/info":
+    get:
+      summary: Get api infos
+      description: ''
+      tags:
+      - Monitoring
+      responses:
+        '200':
+          description: Api infos
+          schema:
+            "$ref": "#/definitions/ApiInformation"
+  "/ping":
+    get:
+      summary: Ping api
+      description: ''
+      tags:
+      - Monitoring
+      responses:
+        '200':
+          description: Ping
+  "/documents":
+    post:
+      summary: Upload a document
+      description: Upload a document in order to use to send a registered mail
+      tags:
+      - Send registered mail
+      consumes:
+      - multipart/form-data
+      parameters:
+      - name: X-IBM-Client-Secret
+        in: header
+        required: true
+        type: string
+      - name: X-IBM-Client-Id
+        in: header
+        required: true
+        type: string
+      - name: jwt
+        in: header
+        required: true
+        type: string
+      - name: file
+        required: true
+        in: formData
+        type: file
+      - name: mimeType
+        required: true
+        in: formData
+        type: string
+      - name: fileName
+        required: true
+        in: formData
+        type: string
+      responses:
+        '201':
+          description: The document has been upload successfully
+          schema:
+            "$ref": "#/definitions/DocumentResponse"
+        '400':
+          description: The request is incomplete or not properly formatted
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+        '500':
+          description: An internal server error occurred
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+  "/orders":
+    post:
+      summary: Create an order and send registered mails
+      description: Create an order and send registered mails
+      tags:
+      - Send registered mail
+      consumes:
+      - application/json
+      parameters:
+      - name: X-IBM-Client-Secret
+        in: header
+        required: true
+        type: string
+      - name: X-IBM-Client-Id
+        in: header
+        required: true
+        type: string
+      - name: jwt
+        in: header
+        required: true
+        type: string
+      - name: body
+        required: true
+        in: body
+        schema:
+          "$ref": "#/definitions/OrderRequest"
+      responses:
+        '201':
+          description: The order has been created successfully
+          schema:
+            "$ref": "#/definitions/OrderResponse"
+        '400':
+          description: The request is incomplete or not properly formatted
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+        '500':
+          description: An internal server error occurred
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+  "/challenge":
+    get:
+      summary: Get the challenge XML
+      description: ''
+      tags:
+      - Authentication
+      responses:
+        '200':
+          description: Successful response; AuthenticationId and ChallengeXmlB64
+          schema:
+            "$ref": "#/definitions/ChallengeResponse"
+        '400':
+          description: Bad request
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+        '500':
+          description: Error response
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+  "/identify":
+    post:
+      summary: ''
+      description: ''
+      tags:
+      - Authentication
+      parameters:
+      - in: body
+        name: body
+        description: IdentifyRequest
+        required: true
+        schema:
+          "$ref": "#/definitions/IdentifyRequest"
+      responses:
+        '200':
+          description: Successful response; Luxtrust JWT
+          schema:
+            type: string
+        '400':
+          description: Bad request
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+        '500':
+          description: Error response
+          schema:
+            "$ref": "#/definitions/ErrorResponse"
+produces:
+- application/json
+x-ibm-configuration:
+  testable: true
+  enforced: true
+  cors:
+    enabled: true
+  assembly:
+    execute:
+    - xpost-it-rancher-policy:
+        version: 1.0.0
+        title: xpost-it-rancher-policy
+        cluster: gs
+        namespace: pcourrier
+        team: fed
+        removeBasePath: 'false'
+        jsonPath: x-ibm-configuration.assembly.execute[0].xpost-it-rancher-policy
+  gateway: datapower-api-gateway
+  phase: realized
+  activity-log:
+    enabled: true
+    success-content: header
+    error-content: payload
+schemes:
+- https
+definitions:
+  ApiInformation:
+    type: object
+    properties:
+      name:
+        type: string
+      version:
+        type: string
+      env:
+        type: string
+  DocumentRequest:
+    type: object
+    properties:
+      mimeType:
+        type: string
+        description: Mime type of the file
+      fileName:
+        type: string
+        description: Name of the file
+      data:
+        type: string
+        description: Data of the file as a base64 string
+  DocumentResponse:
+    type: object
+    properties:
+      documentId:
+        type: string
+        description: UUID of the uploaded file
+  OrderRequest:
+    type: object
+    properties:
+      orderType:
+        type: string
+        description: Type of the order, can be ELECTRONIC, PAPER or OPTIMAL
+        enum:
+        - ELECTRONIC
+        - PAPER
+        - OPTIMAL
+      orderName:
+        type: string
+        description: Optional name of the order, can be used as a reminder when consulting
+          the history of orders
+      sender:
+        "$ref": "#/definitions/Address"
+        description: Identity of the sender
+      recipients:
+        type: array
+        items:
+          "$ref": "#/definitions/Recipient"
+        description: List of recipients (registered mails)
+      emailNotification:
+        type: boolean
+        description: ''
+  OrderResponse:
+    type: object
+    properties:
+      orderId:
+        type: string
+        description: Id of the created order
+      orderStatus:
+        type: string
+        description: Status of the order
+      recipients:
+        type: array
+        items:
+          "$ref": "#/definitions/RegisteredMail"
+  Recipient:
+    type: object
+    properties:
+      id:
+        type: string
+      address:
+        "$ref": "#/definitions/Address"
+        description: Identity of the recipient
+      options:
+        "$ref": "#/definitions/RecipientOptions"
+      documents:
+        type: array
+        items:
+          "$ref": "#/definitions/Document"
+          description: List of documents to be sent to the recipient. For PAPER and
+            OPTIMAL the number of document is limited to 1
+  RecipientOptions:
+    type: object
+    properties:
+      acknowledgment:
+        type: boolean
+        description: Acknowledgment option
+  Document:
+    type: object
+    properties:
+      documentId:
+        type: string
+        description: UUID of the uploaded file
+      printingOptions:
+        "$ref": "#/definitions/PrintingOptions"
+        description: Printing option for the document, required for PAPER and OPTIMAL
+  PrintingOptions:
+    type: object
+    properties:
+      color:
+        type: string
+        description: Define if the document should be printed in color or in black
+          and white
+        enum:
+        - COLOR
+        - BLACK-WHITE
+      format:
+        type: string
+        description: Define the format of the envelop to be used to send the document
+        enum:
+        - FORMAT-C4
+        - FORMAT-C5
+        - FORMAT-US
+      recto:
+        type: string
+        description: Define if the document should be printed recto-verso or only
+          on the recto
+        enum:
+        - RECTO
+        - RECTO-VERSO
+  Address:
+    type: object
+    properties:
+      id:
+        type: string
+      companyName:
+        type: string
+        description: Name of the company
+        maxLength: 50
+      service:
+        type: string
+        description: Optional name of the service when sending a registered mail to
+          a company
+        maxLength: 50
+      function:
+        type: string
+        description: Optional function of the recipient when sending a registered
+          mail to a company
+      civility:
+        type: string
+        description: Civility of the recipient
+        maxLength: 30
+      lastName:
+        type: string
+        description: Lastname of the recipient
+        maxLength: 50
+      firstName:
+        type: string
+        description: Firstname of the recipient
+        maxLength: 50
+      zip:
+        type: string
+        description: Zip code of the address of the recipient, required for PAPER
+          and OPTIMAL
+      city:
+        type: string
+        description: Name of the city of the address of the recipient, required for
+          PAPER and OPTIMAL
+      street:
+        type: string
+        description: Name of the street of the address of the recipient, required
+          for PAPER and OPTIMAL
+      streetNumber:
+        type: string
+        description: Number of the address of the recipient
+      supplement:
+        type: string
+        description: Supplement information for the address of the recipient
+      country:
+        type: string
+        description: Country of the address of the recipient, required for PAPER and
+          OPTIMAL
+      email:
+        type: string
+        description: email of the recipient, required for ELECTRONIC
+      landlineNumberPrefix:
+        type: string
+        description: Prefix of the phone number of the recipient
+      landlineNumber:
+        type: string
+        description: Phone number of the recipient (without the prefix)
+      mobileNumberPrefix:
+        type: string
+        description: Prefix of the mobile phone number of the recipient
+      mobileNumber:
+        type: string
+        description: Mobile phone number of the recipient (without the prefix)
+  RegisteredMail:
+    type: object
+    properties:
+      trackingNumber:
+        type: string
+        description: Tracking number of the registered mail
+      type:
+        type: string
+        description: Type of the sent registered mail, can be ELECTRONIC or PAPER
+        enum:
+        - ELECTRONIC
+        - PAPER
+      sender:
+        "$ref": "#/definitions/Sender"
+      recipient:
+        "$ref": "#/definitions/Recipient"
+  Sender:
+    type: object
+    properties:
+      companyName:
+        type: string
+        description: Name of the company
+      lastName:
+        type: string
+        description: Lastname of the recipient
+      firstName:
+        type: string
+        description: Firstname of the recipient
+  ErrorResponse:
+    type: object
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+  ChallengeResponse:
+    type: object
+    properties:
+      authenticationId:
+        type: string
+      challengeXmlB64:
+        type: string
+  IdentifyRequest:
+    type: object
+    properties:
+      authenticationId:
+        type: string
+      sealedChallengeXmlB64:
+        type: string
+securityDefinitions:
+  clientIdHeader:
+    type: apiKey
+    in: header
+    name: X-IBM-Client-Id
+  clientSecretHeader:
+    type: apiKey
+    in: header
+    name: X-IBM-Client-Secret
+swagger: '2.0'
+info:
+  x-ibm-name: reel-m2m-api
+  title: REEL M2M API
+  description: REEL M2M API
+  version: '1.0'
+consumes:
+- application/json
